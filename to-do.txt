@@ -4,3 +4,8 @@ Create Payments View
 Create Edit GWPricing Endpoint
 Create Merchant Registration Endpoint
 Refactor Access Control for Groups
+Refactor Pricing Logic
+Add NMR Amount to Registration
+Add Invoice Lines Table
+Add Invoice Breakout View
+Email Sending on Registration and Enmass
