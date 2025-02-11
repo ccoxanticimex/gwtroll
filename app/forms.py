@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, IntegerField, HiddenField, SelectMultipleField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, IntegerField, HiddenField, SelectMultipleField, FloatField
 from wtforms.fields import DateField
 from wtforms.validators import DataRequired, Email, InputRequired, Optional, ValidationError, NoneOf, EqualTo, Length
 import pandas as pd
@@ -241,4 +241,21 @@ class ReportForm(FlaskForm):
     report_type = SelectField('Report Type', validators=[DataRequired()], choices=reporttypedata)
     dt_start = DateField('Start Date', format='%Y-%m-%d')
     dt_end = DateField('End Date', format='%Y-%m-%d')
+    submit = SubmitField('Submit')
+
+class CreateInvocieForm(FlaskForm):
+    invoice_number = IntegerField('Invoice Number',validators=[InputRequired()])
+    invoice_email = StringField('Invoice Email', validators=[DataRequired()])
+    invoice_date = DateField('Invoice Date', validators=[DataRequired()])
+    invoice_type = SelectField('Invoice Type')
+    amount = FloatField('Invoice Amount', validators=[DataRequired()])
+    balance = FloatField('Invoice Balance', validators=[DataRequired()])
+    registrations = SelectMultipleField('Registrations', validators=[DataRequired()])
+    submit = SubmitField('Submit')
+
+class CreatePaymentForm(FlaskForm):
+    invoice_number = IntegerField('Invoice Number',validators=[InputRequired()])
+    invoice_email = StringField('Invoice Email', validators=[DataRequired()])
+    payment_date = DateField('Payment Date', validators=[DataRequired()])
+    amount = FloatField('Payment Amount', validators=[DataRequired()])
     submit = SubmitField('Submit')

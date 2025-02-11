@@ -33,52 +33,59 @@
             <th>Invoice Number</th>
             <th>Invoice Date</th>
             <th>Email</th>
-            <th>First Name</th>
-            <th>Last Name</th>
-            {% if back == 'all' %}
-            <th>Status</th>
-            {% endif %}
-            <th>Update</th>
+            <th>Invoice Total</th>
+            <th>Balance</th>
+            <th>Registrations</th>
+            <th>Action</th>
         </tr>
     </thread>
     <tbody>
       {% if regs %}
         {%for reg in regs %}
         <tr>
-            <form action="/invoice/{{reg.regid}}" method="GET">
-                <td style="display: none;">
-                    <input type="hidden" name="back" id="back" value="{{back}}">{{back}}
-                </td>
-                <td> 
-                    {{reg.invoice_number}}
-                </td>
-                {% if reg.invoice_date %}
-                <td> 
-                    {{reg.invoice_date.strftime('%m-%d-%Y')}}
-                </td>
-                {% else %}
-                <td> 
-                  None
-                </td>
-                {% endif %}
-                <td> 
-                    {{reg.invoice_email}}
-                </td>
-                <td> 
-                    {{reg.fname}}
-                </td>
-                <td> 
-                    {{reg.lname}}
-                </td>
-                {% if back == 'all' %}
-                <td> 
-                  {{reg.invoice_status}}
-                </td>
-                {% endif %}
-                <td>
-                    <input class="form__submit form__input" type="Submit" value="Update"/>
-                </td>
-            </form>
+          <td> 
+              {{reg.invoice_number}}
+          </td>
+          {% if reg.invoice_date %}
+          <td> 
+              {{reg.invoice_date.strftime('%m-%d-%Y')}}
+          </td>
+          {% else %}
+          <td> 
+            None
+          </td>
+          {% endif %}
+          <td> 
+            {{reg.invoice_email}}
+          </td>
+          <td> 
+              {{reg.amount}}
+          </td>
+          <td> 
+              {{reg.balance}}
+          </td>
+          <td>
+          {% if back == 'UNSENT' %}
+            {% for r in reg.registrations %} 
+            <a href="/{{r.regid}}">{{r.fname}} {{r.lname}}</a><br>
+            {% endfor %}
+          {% endif %}
+          {% if back != 'UNSENT' %}
+          {% for r in reg.registrations %} 
+          <a href="/{{r.regid}}">{{r.inv_registration.fname}} {{r.inv_registration.lname}}</a><br>
+          {% endfor %}
+        {% endif %}
+          </td>
+          {% if back == 'UNSENT' %}
+          <td>
+            <a href="/invoice/create?invoice_email={{reg.invoice_email}}&amount={{reg.amount}}&balance={{reg.balance}}&registrations={{reg.registrationids}}" class="btn btn-info" role="button">Create Invoice</a>
+          </td>
+          {% endif %}
+          {% if back == 'OPEN' %}
+          <td>
+            <a href="/payment/create/{{reg.invoice_number}}" class="btn btn-primary" role="button">Edit Invoice</a>
+          </td>
+          {% endif %}
         </tr>
         {% endfor %}
         {% endif %}

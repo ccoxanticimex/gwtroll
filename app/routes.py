@@ -1,6 +1,6 @@
 from app import app, db, login
 from app.forms import *
-from app.models import Registrations, User, Role, UserRoles, RegLogs
+from app.models import *
 import psycopg2
 import psycopg2.extras
 from flask import Flask, render_template, request, url_for, flash, redirect, send_from_directory, send_file
@@ -20,6 +20,7 @@ import uuid
 import json
 import csv
 import codecs
+import ast
 
 @login.unauthorized_handler
 def unauthorized_callback():
@@ -360,134 +361,6 @@ def reg(regid):
         return redirect(url_for('checkin', regid=regid))
     else:
         return render_template('reg.html', reg=reg)
-    
-@app.route('/invoice/unsent', methods=('GET', 'POST'))
-@login_required
-@roles_accepted('Admin','Invoices','Department Head')
-def unsentinvoices():
-    regs = Registrations.query.filter(and_(Registrations.invoice_number == None, Registrations.invoice_status != 'CANCELED', Registrations.invoice_status != 'DUPLICATE', Registrations.invoice_status != 'SENT', Registrations.invoice_status != 'PAID', Registrations.prereg_status == "SUCCEEDED")).all()
-    preregtotal = prereg_total()
-    invoicecount = unsent_count()
-    regcount = unsent_reg_count()
-    return render_template('invoice_list.html', regs=regs, preregtotal=preregtotal, invoicecount=invoicecount, regcount=regcount, back='unsent')
-
-@app.route('/invoice/open', methods=('GET', 'POST'))
-@login_required
-@roles_accepted('Admin','Invoices','Department Head')
-def openinvoices():
-    regs = Registrations.query.filter(and_(Registrations.invoice_number != None, Registrations.prereg_status == "SUCCEEDED", Registrations.invoice_status == 'SENT')).all()
-    preregtotal = prereg_total()
-    invoicecount = open_count()
-    regcount = open_reg_count()
-    return render_template('invoice_list.html', regs=regs, preregtotal=preregtotal, invoicecount=invoicecount, regcount=regcount, back='open')
-
-@app.route('/invoice/paid', methods=('GET', 'POST'))
-@login_required
-@roles_accepted('Admin','Invoices','Department Head')
-def paidinvoices():
-    regs = Registrations.query.filter(and_(Registrations.invoice_number != None, Registrations.prereg_status == "SUCCEEDED", Registrations.invoice_status == 'PAID')).all()
-    preregtotal = prereg_total()
-    invoicecount = paid_count()
-    regcount = paid_reg_count()
-    return render_template('invoice_list.html', regs=regs, preregtotal=preregtotal, invoicecount=invoicecount, regcount=regcount, back='paid')
-
-@app.route('/invoice/canceled', methods=('GET', 'POST'))
-@login_required
-@roles_accepted('Admin','Invoices','Department Head')
-def canceledinvoices():
-    regs = Registrations.query.filter(and_(Registrations.prereg_status == "SUCCEEDED", or_(Registrations.invoice_status == 'CANCELED', Registrations.invoice_status == 'DUPLICATE'))).all()
-    preregtotal = prereg_total()
-    invoicecount = canceled_count()
-    regcount = canceled_reg_count()
-    return render_template('invoice_list.html', regs=regs, preregtotal=preregtotal, invoicecount=invoicecount, regcount=regcount, back='canceled')
-
-@app.route('/invoice/all', methods=('GET', 'POST'))
-@login_required
-@roles_accepted('Admin','Invoices','Department Head')
-def allinvoices():
-    regs = Registrations.query.filter(Registrations.prereg_status == "SUCCEEDED").all()
-    return render_template('invoice_list.html', regs=regs, back='all')
-
-@app.route('/invoice/<int:regid>', methods=('GET', 'POST'))
-@login_required
-@roles_accepted('Admin','Invoices','Department Head')
-def updateinvoice(regid):
-    back = request.args.get('back')
-    reg = get_reg(regid)
-    form = UpdateInvoiceForm()
-    form.price_paid.data = reg.price_paid
-    form.price_calc.data = reg.price_calc
-    form.paypal_donation_amount.data = reg.paypal_donation_amount
-    form.price_due.data = reg.price_due
-    form.invoice_number.data = reg.invoice_number
-    form.invoice_paid.data = reg.invoice_paid
-    if reg.invoice_date is not None:
-        form.invoice_date.data = reg.invoice_date
-    else:
-        form.invoice_date.data = datetime.now()
-    form.invoice_canceled.data = reg.invoice_canceled
-    form.invoice_payment_date.data = reg.invoice_payment_date
-    form.duplicate_invoice.data = True if reg.invoice_status == 'DUPLICATE' else False
-    
-    if request.method == 'POST':
-        invoice_number = request.form.get('invoice_number')
-        price_paid = int(request.form.get('price_paid'))
-        price_calc = int(request.form.get('price_calc'))
-        invoice_date = request.form.get('invoice_date')
-        invoice_payment_date = request.form.get('invoice_payment_date')
-        invoice_canceled = bool(request.form.get('invoice_canceled'))
-
-        #if is_duplicate_invoice_number(invoice_number, reg):
-        #    flash('Duplicate Invoice Number {}'.format(
-        #    invoice_number))
-        #    return render_template('update_invoice.html', reg=reg, form=form)
-        
-        if invoice_number is not None and invoice_number != '':
-            reg.invoice_status = 'SENT'
-        if int(price_paid) >= int(price_calc) + int(reg.paypal_donation_amount):
-            reg.invoice_status = 'PAID'
-        if bool(request.form.get('invoice_canceled')) == True:
-            reg.invoice_status = 'CANCELED'
-        if bool(request.form.get('duplicate_invoice')) == True:
-            reg.invoice_status = 'DUPLICATE'
-
-        reg.price_paid = price_paid
-        reg.price_calc = price_calc
-        if invoice_number != None and invoice_number != '':          
-            reg.invoice_number = invoice_number
-
-        if invoice_date != '' and invoice_date is not None:
-            reg.invoice_date = invoice_date
-        if invoice_payment_date != '' and invoice_payment_date is not None:
-            reg.invoice_payment_date = invoice_payment_date
-
-        reg.invoice_canceled = invoice_canceled
-
-        reg.price_due = (price_calc + reg.paypal_donation_amount) - price_paid
-
-        reg.pay_type = 'paypal'
-
-        db.session.commit()
-
-        log_reg_action(reg, 'INVOICE UPDATED')
-
-        match back:
-            case 'unsent': 
-                return redirect('/invoice/unsent')
-            case 'open': 
-                return redirect('/invoice/open')
-            case 'paid': 
-                return redirect('/invoice/paid')
-            case 'canceled': 
-                return redirect('/invoice/canceled')
-            case 'all': 
-                return redirect('/invoice/all')
-            case _:
-                return redirect('/')
-
-
-    return render_template('update_invoice.html', reg=reg, form=form)
-
 
 @app.route('/role/create', methods=('GET', 'POST'))
 @login_required
@@ -652,12 +525,11 @@ def createprereg():
             country = form.country.data,
             phone = form.phone.data, 
             email = form.email.data, 
-            invoice_email = form.invoice_email.data,
             rate_age = form.rate_age.data,
             kingdom = form.kingdom.data, 
+            invoice_email = form.invoice_email.data,
             lodging = form.lodging.data, 
             prereg_status = 'SUCCEEDED',
-            invoice_status = 'UNSENT',
             rate_mbr = form.rate_mbr.data,
             mbr_num_exp = form.mbr_num_exp.data, 
             mbr_num = form.mbr_num.data,
@@ -706,7 +578,6 @@ def createprereg():
         db.session.add(reg)
         db.session.commit()
 
-        regid = reg.regid
         flash('Registration {} created for {} {}.'.format(
             reg.regid, reg.fname, reg.lname))
         
@@ -716,7 +587,6 @@ def createprereg():
 @app.route('/success')
 def success():
     return render_template('reg_success.html')
-
 
 @app.route('/create', methods=('GET', 'POST'))
 @login_required
@@ -741,7 +611,6 @@ def create():
         country = form.country.data,
         phone = form.phone.data,
         email = form.email.data,
-        invoice_email = form.invoice_email.data,
         onsite_contact_name = form.onsite_contact_name.data, 
         onsite_contact_sca_name = form.onsite_contact_sca_name.data, 
         onsite_contact_kingdom = form.onsite_contact_kingdom.data, 
@@ -788,7 +657,6 @@ def editreg():
         country = reg.country,
         phone = reg.phone,
         email = reg.email,
-        invoice_email = reg.invoice_email,
         kingdom = reg.kingdom,
         lodging = reg.lodging,
         rate_age = reg.rate_age,
@@ -847,7 +715,6 @@ def editreg():
             reg.country = request.form.get('country')
             reg.phone = request.form.get('phone')
             reg.email = request.form.get('email')
-            reg.invoice_email = request.form.get('invoice_email')
             reg.kingdom = request.form.get('kingdom')
             reg.lodging = request.form.get('lodging')
             reg.rate_date = datetime.strptime(request.form.get('rate_date'), '%Y-%m-%d')
@@ -901,7 +768,112 @@ def editreg():
 
     return render_template('editreg.html', regid=reg.regid, reg=reg, form=form)
 
+@app.route('/invoice/unsent', methods=['GET', 'POST'])
+@login_required
+@roles_accepted('Admin','Invoices','Department Head')
+def invoicesunsent():
+    unsent_invoices = Registrations.query.filter(Registrations.invoices == None).all()
+    regs = {}
+    regs_list = []
+    for reg in unsent_invoices:
+        if reg.invoice_email not in regs:
+            regs[reg.invoice_email] = {'invoice_email':reg.invoice_email,'registrations':[], 'registrationids': [], 'amount':0, 'balance':0}
+        regs[reg.invoice_email]['registrations'].append(reg)
+        regs[reg.invoice_email]['registrationids'].append(reg.regid)
+        regs[reg.invoice_email]['amount'] += reg.price_due
+        regs[reg.invoice_email]['balance'] += reg.price_due
+    
+    for reg in regs:
+        regs_list.append(regs[reg])
 
+    return render_template('invoice_list.html', back='UNSENT', regs=regs_list)
+
+@app.route('/invoice/open', methods=['GET', 'POST'])
+@login_required
+@roles_accepted('Admin','Invoices','Department Head')
+def invoicesopen():
+    invoices = Invoices.query.filter().all()
+
+    return render_template('invoice_list.html', back='OPEN', regs=invoices)
+
+@app.route('/invoice/create', methods=['GET', 'POST'])
+@login_required
+@roles_accepted('Admin','Invoices','Department Head')
+def invoicescreate():
+
+    invoice_email = request.args.get('invoice_email')
+    amount = request.args.get('amount')
+    balance = request.args.get('balance')
+    registrations_list = ast.literal_eval(request.args.get('registrations'))
+    registrations = Registrations.query.filter(Registrations.regid.in_(registrations_list)).all()
+    form = CreateInvocieForm(
+        invoice_email = invoice_email,
+        invoice_date = datetime.today().date(),
+        amount = amount,
+        balance = balance,
+    )
+    form.invoice_type.choices = (('paypal','PayPal'),('zettle','Zettle'))
+    form.registrations.choices = [(reg.regid,reg.fname + " " + reg.lname) for reg in registrations]
+    form.registrations.process_data([reg.regid for reg in registrations])
+
+    if request.method == 'POST':
+        invoice = Invoices(
+            invoice_number = form.invoice_number.data,
+            invoice_email = form.invoice_email.data,
+            invoice_date = form.invoice_date.data,
+            invoice_type = form.invoice_type.data,
+            amount = form.amount.data,
+            balance = form.balance.data
+        )
+        db.session.add(invoice)
+        for reg in registrations:
+            reg.invoices.append(invoice)
+
+    
+        db.session.commit()
+
+
+    return render_template('create_invoice.html', form=form)
+
+@app.route('/payment/create/<int:invoice_number>', methods=['GET', 'POST'])
+@login_required
+@roles_accepted('Admin','Invoices','Department Head')
+def paymentcreate(invoice_number):
+
+    invoice = Invoices.query.filter(Invoices.invoice_number == invoice_number).first()
+
+    form = CreatePaymentForm(
+        invoice_number = invoice.invoice_number,
+        invoice_email = invoice.invoice_email,
+        payment_date = datetime.today().date(),
+        amount = invoice.balance
+    )
+
+    if request.method == 'POST':
+        payment = Payments(
+            amount = form.amount.data,
+            payment_date = form.payment_date.data,
+            invoice_number = form.invoice_number.data
+        )
+
+        invoice.balance -= float(form.amount.data)
+
+        print(invoice.registrations)
+
+        payment_amount = float(form.amount.data)
+        for reg in invoice.registrations:
+            if reg.inv_registration.price_due <= payment_amount:
+                payment_amount -= reg.inv_registration.price_due
+                reg.inv_registration.price_paid = reg.inv_registration.price_due
+            else:
+                reg.inv_registration.price_paid = payment_amount
+                payment_amount = 0
+
+        db.session.add(payment)
+
+        db.session.commit()
+
+    return render_template('create_payment.html', form=form)
 
 @app.route('/checkin', methods=['GET', 'POST'])
 @login_required
@@ -1410,7 +1382,6 @@ def payment():
     form.fname.data = reg.fname
     form.lname.data = reg.lname
     form.scaname.data = reg.scaname
-    form.invoice_email.data = reg.invoice_email
     form.price_calc.data = reg.price_calc
     form.price_due.data = reg.price_due
     form.pay_type.data = reg.atd_pay_type

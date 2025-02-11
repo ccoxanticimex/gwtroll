@@ -60,12 +60,7 @@ def load_user(id):
 class Registrations(db.Model):
     regid: so.Mapped[int] = so.mapped_column(primary_key=True)
     order_id: so.Mapped[Optional[int]]
-    invoice_number: so.Mapped[Optional[str]] 
-    invoice_paid: so.Mapped[bool] = so.mapped_column(default=False)
-    invoice_date: so.Mapped[Optional[datetime]]
-    invoice_payment_date: so.Mapped[Optional[datetime]]
-    invoice_canceled: so.Mapped[bool] = so.mapped_column(default=False)
-    invoice_status: so.Mapped[Optional[str]]
+    invoices = db.relationship('Invoices', secondary='registrations_invoices')
     refund_check_num: so.Mapped[Optional[int]]
     fname: so.Mapped[str] 
     lname: so.Mapped[str] 
@@ -121,3 +116,52 @@ class RegLogs(db.Model):
     userid = db.Column(db.Integer(), db.ForeignKey('users.id'))
     timestamp = db.Column(db.DateTime())
     action = db.Column(db.String())
+
+class Invoices(db.Model):
+    __tablename__ = 'invoices'  
+    invoice_number = db.Column(db.Integer(), primary_key=True)
+    invoice_email = db.Column(db.String(), nullable=False)
+    invoice_date = db.Column(db.DateTime())
+    invoice_type = db.Column(db.String())
+    canceled = db.Column(db.Boolean, default=False)
+    amount = db.Column(db.Float(), nullable=False)
+    balance = db.Column(db.Float(), nullable=False)
+    registrations = db.relationship("Registrations_Invoices", backref=db.backref("registrations_invoices", uselist=False))
+
+class InvoiceLines(db.Model):
+    __tablename__ = 'invoicelines' 
+    line_number = db.Column(db.Integer(), primary_key=True)
+    invoice_number = db.Column(db.Integer(), db.ForeignKey('invoices.invoice_number', ondelete='CASCADE'))
+    line_description = db.Column(db.String(), nullable=False)
+    amount = db.Column(db.Float(), nullable=False)
+
+class Registrations_Invoices(db.Model):
+    __tablename__ = 'registrations_invoices'
+    id = db.Column(db.Integer(), primary_key=True)
+    regid = db.Column(db.Integer(), db.ForeignKey('registrations.regid', ondelete='CASCADE'))
+    inv_registration = db.relationship("Registrations", backref=db.backref("registrations", uselist=False))
+    invoice_number = db.Column(db.Integer(), db.ForeignKey('invoices.invoice_number', ondelete='CASCADE'))
+
+    def mydefault(context):
+        params = context.get_current_parameters()
+        return 
+
+
+class Payments(db.Model):
+    __tablename__ = 'payments'
+    id = db.Column(db.Integer(), primary_key=True)
+    amount = db.Column(db.Float(), nullable=False)
+    payment_date = db.Column(db.DateTime(), nullable=False)
+    invoice_number = db.Column(db.Integer(), db.ForeignKey('invoices.invoice_number'))
+    invoice = db.relationship("Invoices", backref=db.backref("invoices", uselist=False))
+
+class Refunds(db.Model):
+    __tablename__ = 'refunds'
+    id = db.Column(db.Integer(), primary_key=True)
+    amount = db.Column(db.Float(), nullable=False)
+    check_date = db.Column(db.DateTime(), nullable=False)
+    check_number = db.Column(db.Integer(), nullable=False)
+
+    invoice_number = db.Column(db.Integer(), db.ForeignKey('invoices.invoice_number'))
+    invoice = db.relationship("Invoices", backref=db.backref("invoices", uselist=False))
+

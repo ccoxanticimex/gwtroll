@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<form action="" method="POST">
+    {{ form.hidden_tag() }}
+    <div class="row">
+        <div class="col">
+            <p>
+                {{ form.payment_date.label }}<br>
+                {{ form.payment_date(class_='form-control') }}
+            </p>
+        </div>
+        <div class="col">
+            <p>
+                {{ form.invoice_number.label }}<br>
+                {{ form.invoice_number(class_='form-control') }}
+            </p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <p>
+                {{ form.invoice_email.label }}<br>
+                {{ form.invoice_email(class_='form-control', readonly=true) }}
+            </p>
+        </div>
+        <div class="col">
+            <p>
+                {{ form.amount.label }}<br>
+                {{ form.amount(class_='form-control', readonly=true) }}
+            </p>
+        </div>
+    </div>
+</div>
+  
+    <p>{{ form.submit(class_='form-control btn-primary btn-lg') }}</p>
+    </form>
+
+   
+{% endblock %}
+
+{% block script %}
+
+{% endblock %}
